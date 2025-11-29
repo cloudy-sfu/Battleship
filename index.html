@@ -3,34 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sea Battle Chess</title>
+    <title>Battleship</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1 style="text-align: center;">Battleship</h1>
-    <div id="message-log">Game Start</div>
+    <div id="message-log"></div>
 
     <div class="game-container">
         <div class="board-section">
-            <h2>Player Fleet</h2>
+            <h2>Player's Fleet</h2>
             <div id="player-board" class="board"></div>
-            <div class="status-indicator">Your Status</div>
         </div>
 
         <div class="controls">
             <button id="start-btn" onclick="startGame()">Restart Game</button>
             
             <div class="legend">
-                <div class="legend-item"><span class="box ship-box"></span> My ships</div>
-                <div class="legend-item"><span class="box red-cross"></span> Hit</div>
-                <div class="legend-item"><span class="box gray-cross"></span> Miss</div>
+                <div class="legend-item"><span class="box ship-box"></span>My ships</div>
+                <div class="legend-item"><span class="box red-cross"></span>Hit</div>
+                <div class="legend-item"><span class="box gray-cross"></span>Miss</div>
             </div>
         </div>
 
         <div class="board-section">
-            <h2>Computer Fleet</h2>
+            <h2>Computer's Fleet</h2>
             <div id="computer-board" class="board clickable-board"></div>
-            <div class="status-indicator">Opponent Status</div>
         </div>
     </div>
 
