@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sea Battle Chess</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1 style="text-align: center;">Battleship</h1>
+    <div id="message-log">Game Start</div>
+
+    <div class="game-container">
+        <div class="board-section">
+            <h2>Player Fleet</h2>
+            <div id="player-board" class="board"></div>
+            <div class="status-indicator">Your Status</div>
+        </div>
+
+        <div class="controls">
+            <button id="start-btn" onclick="startGame()">Restart Game</button>
+            
+            <div class="legend">
+                <div class="legend-item"><span class="box ship-box"></span> My ships</div>
+                <div class="legend-item"><span class="box red-cross"></span> Hit</div>
+                <div class="legend-item"><span class="box gray-cross"></span> Miss</div>
+            </div>
+        </div>
+
+        <div class="board-section">
+            <h2>Computer Fleet</h2>
+            <div id="computer-board" class="board clickable-board"></div>
+            <div class="status-indicator">Opponent Status</div>
+        </div>
+    </div>
+
+<!-- Manual Section -->
+<div style="margin: 0 auto 40px auto; padding: 0 20px;">
+    <h2>Rules</h2>
+    <div style="border-top: 2px solid black; padding-top: 10px;">
+        <p>Reference: <a href="https://en.wikipedia.org/wiki/Battleship_(game)" target="_blank">Wikipedia Battleship</a></p>
+        <h3>1. Objective</h3>
+        <p>The objective is to locate and destroy the opposing fleet before they destroy yours. The first commander to sink all 10 enemy vessels wins the match.</p>
+
+        <h3>2. Fleet Configuration</h3>
+        <p>Each party commands a fleet of <strong>10 vessels</strong> occupying a specific number of linear grid squares:</p>
+        <ul>
+            <li><strong>1x Battleship</strong> (Size: 4 squares)</li>
+            <li><strong>2x Cruisers</strong> (Size: 3 squares)</li>
+            <li><strong>3x Destroyers</strong> (Size: 2 squares)</li>
+            <li><strong>4x Submarines</strong> (Size: 1 square)</li>
+        </ul>
+
+        <h3>3. Deployment Protocols</h3>
+        <p>Ships are deployed on a 10x10 grid according to the following strict isolation rules:</p>
+        <ul>
+            <li><strong>Linear Alignment:</strong> All vessels must be placed in a straight line, oriented either <strong>vertically</strong> or <strong>horizontally</strong>. Diagonal placement of the ship hull itself is prohibited.</li>
+            <li><strong>Spatial Isolation:</strong> No two vessels may occupy adjacent coordinates. This prohibition applies to both <strong>orthogonal</strong> (side-by-side) and <strong>diagonal</strong> adjacency.</li>
+            <li><strong>Minimum Buffer:</strong> There must be at least one empty water grid cell separating any part of one ship from another.</li>
+        </ul>
+
+        <h3>4. Engagement Rules</h3>
+        <p>The game proceeds in turns, starting with the Player.</p>
+        <ul>
+            <li><strong>Firing:</strong> On your turn, select a coordinate on the opponent's grid to fire.</li>
+            <li><strong>The "Rapid Fire" Mechanic:</strong>
+                <ul>
+                    <li><strong>Hit:</strong> If a shot successfully strikes an enemy vessel, the active player retains the initiative and <strong>must fire again</strong>. This continuation applies even if the shot sinks the vessel (unless it is the final ship).</li>
+                    <li><strong>Miss:</strong> If a shot lands on empty water, the turn concludes immediately, and control passes to the opponent.</li>
+                </ul>
+            </li>
+            <li><strong>Sinking & Area Denial:</strong> When a vessel sustains hits to all its coordinates, it is considered <strong>Sunk</strong>. Upon sinking, all grid cells immediately surrounding the sunken vessel (orthogonally and diagonally) are automatically revealed and marked as <strong>"Miss"</strong> (Gray Cross).</li>
+        </ul>
+
+        <h3>5. Victory Conditions</h3>
+        <p>The match concludes immediately when a player successfully sinks the final remaining ship of the opposing fleet.</p>
+    </div>
+</div>
+
+    <script src="logic.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
