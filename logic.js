@@ -165,7 +165,23 @@ class BattleshipLogic {
 
     updateAIPredictionAfterHit(r, c, resultStatus) {
         if (resultStatus === 'hit') {
-            const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
+            // Check adjacent cells to determine if we have established an orientation
+            const isHorizontal = (c > 0 && this.playerBoard[r][c - 1] === STATUS.HIT) || 
+                                 (c < BOARD_SIZE - 1 && this.playerBoard[r][c + 1] === STATUS.HIT);
+            const isVertical = (r > 0 && this.playerBoard[r - 1][c] === STATUS.HIT) || 
+                               (r < BOARD_SIZE - 1 && this.playerBoard[r + 1][c] === STATUS.HIT);
+
+            let neighbors = [];
+            
+            // If direction is known, only hunt along that axis. Otherwise, hunt all directions.
+            if (isHorizontal) {
+                neighbors = [[r, c - 1], [r, c + 1]];
+            } else if (isVertical) {
+                neighbors = [[r - 1, c], [r + 1, c]];
+            } else {
+                neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]];
+            }
+
             for (let i = neighbors.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
@@ -178,4 +194,5 @@ class BattleshipLogic {
             });
         }
     }
+
 }
