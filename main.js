@@ -1,6 +1,13 @@
 const game = new BattleshipLogic();
 let isPlayerTurn = true;
 let gameActive = false;
+let isProcessing = false;
+
+// Audio Effects
+const shootSound = new Audio('audio/shoot.wav');
+const hitSound = new Audio('audio/hit.wav');
+const missSound = new Audio('audio/miss.wav');
+const explodeSound = new Audio('audio/ship_explode.wav');
 
 // DOM Elements
 const playerBoardDiv = document.getElementById('player-board');
@@ -8,11 +15,19 @@ const computerBoardDiv = document.getElementById('computer-board');
 const messageLog = document.getElementById('message-log');
 const startBtn = document.getElementById('start-btn');
 
+function playAudio(audio) {
+    return new Promise(resolve => {
+        audio.currentTime = 0;
+        audio.onended = resolve;
+        audio.play();
+    });
+}
+
 // --- EVENT DELEGATION ---
 // We attach the listener ONCE to the container, not the cells.
 // This prevents the "stuck" bug where re-rendering removed listeners.
 computerBoardDiv.addEventListener('click', (e) => {
-    if (!gameActive || !isPlayerTurn) return;
+    if (!gameActive || !isPlayerTurn || isProcessing) return;
 
     // Find the closest cell element
     const cell = e.target.closest('.cell');
@@ -62,39 +77,55 @@ function renderBoard(container, boardData, isPlayer) {
     }
 }
 
-function handlePlayerClick(r, c) {
+async function handlePlayerClick(r, c) {
+    isProcessing = true;
     const result = game.hit(PARTY.PLAYER, [r, c]);
     
-    if (result.status === 'invalid') return;
-
+    if (result.status === 'invalid') {
+        isProcessing = false;
+        return;
+    }
     renderBoards();
 
+    await playAudio(shootSound);
+
+    
     if (result.gameOver) {
         messageLog.textContent = "VICTORY! You sank all enemy ships!";
         messageLog.style.color = "green";
         gameActive = false;
+        isProcessing = false;
         return;
     }
 
-    if (result.status === 'hit' || result.status === 'sunk') {
-        messageLog.textContent = result.status === 'sunk' ? "You SANK a ship! Shoot again!" : "HIT! Shoot again!";
+    if (result.status === 'sunk') {
+        messageLog.textContent = "You SANK a ship! Shoot again!";
+        await playAudio(explodeSound);
+        // IMPORTANT: Player keeps turn. We do NOT call computerTurn.
+    } else if (result.status === 'hit') {
+        messageLog.textContent = "HIT! Shoot again!";
+        await playAudio(hitSound);
         // IMPORTANT: Player keeps turn. We do NOT call computerTurn.
     } else {
         messageLog.textContent = "MISS. Computer's turn...";
+        await playAudio(missSound);
         isPlayerTurn = false;
         // Small delay before computer acts
         setTimeout(computerTurn, 800); 
     }
+    isProcessing = false;
 }
 
-function computerTurn() {
+async function computerTurn() {
     if (!gameActive) return;
 
     const [r, c] = game.predict(PARTY.COMPUTER);
     const result = game.hit(PARTY.COMPUTER, [r, c]);
-
+    
     game.updateAIPredictionAfterHit(r, c, result.status);
     renderBoards();
+
+    await playAudio(shootSound);
 
     if (result.gameOver) {
         messageLog.textContent = "DEFEAT! Computer sank all your ships.";
@@ -103,17 +134,23 @@ function computerTurn() {
         return;
     }
 
-    if (result.status === 'hit' || result.status === 'sunk') {
-        messageLog.textContent = result.status === 'sunk' ? "Computer SANK your ship! It shoots again." : "Computer HIT! It shoots again.";
+    if (result.status === 'sunk') {
+        messageLog.textContent = "Computer SANK your ship! It shoots again.";
+        await playAudio(explodeSound);
+        // Computer keeps turn
+        setTimeout(computerTurn, 1000); 
+    } else if (result.status === 'hit') {
+        messageLog.textContent = "Computer HIT! It shoots again.";
+        await playAudio(hitSound);
         // Computer keeps turn
         setTimeout(computerTurn, 1000); 
     } else {
         messageLog.textContent = "Computer MISSED. Your turn.";
+        await playAudio(missSound);
         isPlayerTurn = true;
         // The event listener on computerBoardDiv is always active, 
         // so as soon as isPlayerTurn is true, the player can click.
     }
 }
 
-// Initial Start
 startGame();
