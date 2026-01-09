@@ -147,6 +147,7 @@ button {
     font-size: 1rem;
     transition: opacity 0.2s;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 button:hover {
