@@ -93,7 +93,7 @@ function computerTurn() {
     const [r, c] = game.predict(PARTY.COMPUTER);
     const result = game.hit(PARTY.COMPUTER, [r, c]);
 
-    game.updateAIPredictionAfterHit(r, c, result.status);
+    game.updateComputerPredictionAfterHit(r, c, result.status);
     renderBoards();
 
     if (result.gameOver) {

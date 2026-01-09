@@ -19,7 +19,7 @@ class BattleshipLogic {
         this.computerBoard = this.createEmptyBoard();
         this.playerShips = []; 
         this.computerShips = [];
-        this.aiHitStack = [];
+        this.computerHitStack = [];
     }
 
     createEmptyBoard() {
@@ -31,8 +31,8 @@ class BattleshipLogic {
         this.computerBoard = this.createEmptyBoard();
         this.playerShips = [];
         this.computerShips = [];
-        this.aiHitStack = [];
-        
+        this.computerHitStack = [];
+
         this.placeShipsRandomly(this.playerBoard, this.playerShips);
         this.placeShipsRandomly(this.computerBoard, this.computerShips);
     }
@@ -140,39 +140,113 @@ class BattleshipLogic {
     }
 
     predict(party) {
-        const targetBoard = this.playerBoard; 
-        while(this.aiHitStack.length > 0) {
-            const [r, c] = this.aiHitStack[this.aiHitStack.length - 1];
+        // We only implement this for COMPUTER guessing PLAYER board
+        if (party !== PARTY.COMPUTER) return [0,0];
+
+        const targetBoard = this.playerBoard;
+
+        // --- Phase 1: Target Mode (Stack) ---
+        // If we have a pending target in the stack, use it.
+        while(this.computerHitStack.length > 0) {
+            const [r, c] = this.computerHitStack[this.computerHitStack.length - 1];
             if (targetBoard[r][c] === STATUS.MISS || targetBoard[r][c] === STATUS.HIT) {
-                this.aiHitStack.pop();
+                this.computerHitStack.pop();
             } else {
-                break;
+                return this.computerHitStack.pop();
             }
         }
-        if (this.aiHitStack.length > 0) return this.aiHitStack.pop();
 
-        let available = [];
-        for(let r=0; r<BOARD_SIZE; r++) {
-            for(let c=0; c<BOARD_SIZE; c++) {
-                if (targetBoard[r][c] === STATUS.EMPTY || targetBoard[r][c] === STATUS.SHIP) {
-                    available.push([r, c]);
+        // --- Phase 2: Search Mode (PDF/Heatmap) ---
+        // In a real game, computer wouldn't know playerShips, but logic.js tracks state for both.
+        // We use playerShips to know which ships are remaining (sizes) and which hits are "sunk" hits.
+        const targetShips = this.playerShips;
+
+        // 1. Classify Hits on the Board
+        const sunkHits = new Set();
+        const activeHits = [];
+
+        targetShips.forEach(ship => {
+            if (ship.hits === ship.size) {
+                ship.coords.forEach(([r,c]) => sunkHits.add(`${r},${c}`));
+            }
+        });
+
+        for(let r = 0; r < BOARD_SIZE; r++) {
+            for(let c = 0; c < BOARD_SIZE; c++) {
+                if (targetBoard[r][c] === STATUS.HIT) {
+                    if (!sunkHits.has(`${r},${c}`)) {
+                        activeHits.push([r, c]);
+                    }
                 }
             }
         }
-        if (available.length === 0) return [0,0];
-        return available[Math.floor(Math.random() * available.length)];
+
+        // 2. Identify Remaining Ships
+        const remainingShips = targetShips.filter(s => s.hits < s.size).map(s => s.size);
+
+        // 3. Generate Probability Heatmap
+        const heatmap = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
+
+        // Strategy:
+        // - If there are Active Hits, we prioritize placements that overlap them (Target Mode).
+        // - If no Active Hits, we look for any valid placement (Hunt Mode).
+        // Placements overlapping Active Hits get a massive weight bonus.
+
+        remainingShips.forEach(size => {
+            // Horizontal Scans
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c <= BOARD_SIZE - size; c++) {
+                     this.processPlacement(r, c, size, true, targetBoard, sunkHits, activeHits, heatmap);
+                }
+            }
+            // Vertical Scans
+            for (let r = 0; r <= BOARD_SIZE - size; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                     this.processPlacement(r, c, size, false, targetBoard, sunkHits, activeHits, heatmap);
+                }
+            }
+        });
+
+        // 4. Select Best Target from Heatmap
+        let maxScore = -1;
+        let bestMoves = [];
+
+        for(let r = 0; r < BOARD_SIZE; r++) {
+            for(let c = 0; c < BOARD_SIZE; c++) {
+                // Determine if cell is a valid target (Unknown)
+                // STATUS.EMPTY (0) or STATUS.SHIP (1) are valid targets.
+                // STATUS.MISS (2) or STATUS.HIT (3) are already revealed.
+                const cell = targetBoard[r][c];
+                if (cell !== STATUS.MISS && cell !== STATUS.HIT) {
+                   if (heatmap[r][c] > maxScore) {
+                       maxScore = heatmap[r][c];
+                       bestMoves = [[r,c]];
+                   } else if (heatmap[r][c] === maxScore) {
+                       bestMoves.push([r,c]);
+                   }
+                }
+            }
+        }
+
+        if (bestMoves.length === 0) {
+            // Should rare/impossible if game is not over
+            return this.randomAvailable(targetBoard);
+        }
+
+        // Randomly pick one of the best moves (break ties)
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
     }
 
-    updateAIPredictionAfterHit(r, c, resultStatus) {
+    updateComputerPredictionAfterHit(r, c, resultStatus) {
         if (resultStatus === 'hit') {
             // Check adjacent cells to determine if we have established an orientation
-            const isHorizontal = (c > 0 && this.playerBoard[r][c - 1] === STATUS.HIT) || 
+            const isHorizontal = (c > 0 && this.playerBoard[r][c - 1] === STATUS.HIT) ||
                                  (c < BOARD_SIZE - 1 && this.playerBoard[r][c + 1] === STATUS.HIT);
-            const isVertical = (r > 0 && this.playerBoard[r - 1][c] === STATUS.HIT) || 
+            const isVertical = (r > 0 && this.playerBoard[r - 1][c] === STATUS.HIT) ||
                                (r < BOARD_SIZE - 1 && this.playerBoard[r + 1][c] === STATUS.HIT);
 
-            let neighbors = [];
-            
+            let neighbors;
+
             // If direction is known, only hunt along that axis. Otherwise, hunt all directions.
             if (isHorizontal) {
                 neighbors = [[r, c - 1], [r, c + 1]];
@@ -189,10 +263,68 @@ class BattleshipLogic {
             neighbors.forEach(([nr, nc]) => {
                 if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
                     const cell = this.playerBoard[nr][nc];
-                    if (cell !== STATUS.HIT && cell !== STATUS.MISS) this.aiHitStack.push([nr, nc]);
+                    if (cell !== STATUS.HIT && cell !== STATUS.MISS) this.computerHitStack.push([nr, nc]);
                 }
             });
         }
     }
+
+    processPlacement(r, c, size, horizontal, board, sunkHits, activeHits, heatmap) {
+        let coords = [];
+        let hitOverlapCount = 0;
+
+        for (let i = 0; i < size; i++) {
+            const cr = horizontal ? r : r + i;
+            const cc = horizontal ? c + i : c;
+
+            // Invalid placement if it covers a 'MISS' or a 'SUNK HIT'
+            if (board[cr][cc] === STATUS.MISS) return;
+            if (sunkHits.has(`${cr},${cc}`)) return;
+
+            // Check Hit Overlap (Un-sunk hits)
+            if (board[cr][cc] === STATUS.HIT) {
+                hitOverlapCount++;
+            }
+            coords.push([cr, cc]);
+        }
+
+        // Weight Calculation
+        let weight = 1;
+
+        // Adaptation: If we have active hits, heavily bias towards placements that explain them.
+        if (activeHits.length > 0) {
+             if (hitOverlapCount > 0) {
+                 // Massive spike for explaining hits.
+                 // The more hits covered, the more likely this placement is the "truth".
+                 weight = 1000 + (hitOverlapCount * 100);
+             } else {
+                 // Placements that don't explain the current hits are possible (other ships),
+                 // but significantly less likely to be the immediate target logic.
+                 weight = 1;
+             }
+        }
+
+        // Add weight to all VALID TARGET cells in this placement
+        // (We don't fire at cells that are already HIT)
+        coords.forEach(([cr, cc]) => {
+            if (board[cr][cc] !== STATUS.HIT) {
+                heatmap[cr][cc] += weight;
+            }
+        });
+    }
+
+    randomAvailable(targetBoard) {
+        let available = [];
+        for(let r=0; r<BOARD_SIZE; r++) {
+            for(let c=0; c<BOARD_SIZE; c++) {
+                if (targetBoard[r][c] === STATUS.EMPTY || targetBoard[r][c] === STATUS.SHIP) {
+                    available.push([r, c]);
+                }
+            }
+        }
+        if (available.length === 0) return [0,0];
+        return available[Math.floor(Math.random() * available.length)];
+    }
+
 
 }
